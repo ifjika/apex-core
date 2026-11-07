@@ -1,0 +1,122 @@
+# =============================================================================
+# APEX-Core Git Ignore Rules
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Agent & Internal Directives (Explicitly Ignored)
+# -----------------------------------------------------------------------------
+AGENT.md
+docs/AGENT.md
+**/AGENT.md
+
+# -----------------------------------------------------------------------------
+# Environment & Secrets Configuration
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+application-secret.yml
+application-secret.properties
+application-local.yml
+application-local.properties
+*.pem
+*.key
+*.jks
+*.p12
+
+# -----------------------------------------------------------------------------
+# Java & Maven Build Artifacts
+# -----------------------------------------------------------------------------
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Maven Release & Backup Files
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# -----------------------------------------------------------------------------
+# Logs & Diagnostic Files
+# -----------------------------------------------------------------------------
+*.log
+logs/
+**/logs/
+hs_err_pid*
+replay_pid*
+
+# -----------------------------------------------------------------------------
+# IDE & Code Editor Configurations
+# -----------------------------------------------------------------------------
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+**/out/
+
+# Eclipse
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# -----------------------------------------------------------------------------
+# Local Container & Database Mounts
+# -----------------------------------------------------------------------------
+postgres_data/
+**/postgres_data/
+redpanda_data/
+**/redpanda_data/
+redis_data/
+**/redis_data/
+
+# -----------------------------------------------------------------------------
+# Operating System Generated Files
+# -----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
