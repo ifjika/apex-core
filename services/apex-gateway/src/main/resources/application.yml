@@ -1,0 +1,78 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: apex-gateway
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"
+              - "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+      routes:
+        # HRIS Organizational Domain Route
+        - id: hris-service-route
+          uri: ${HRIS_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/hris/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 150
+                key-resolver: "#{@ipKeyResolver}"
+
+        # Procurement Ingestion Domain Route
+        - id: procurement-service-route
+          uri: ${PROCUREMENT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/procurement/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 150
+                key-resolver: "#{@ipKeyResolver}"
+
+        # Finance Settlement & Accounts Payable Route
+        - id: finance-service-route
+          uri: ${FINANCE_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/finance/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 150
+                key-resolver: "#{@ipKeyResolver}"
+
+apex:
+  security:
+    jwt:
+      # Default 256-bit development secret for signing & verifying tokens
+      secret: "apex-core-super-secure-enterprise-jwt-token-secret-key-32bytes-minimum"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,gateway
+

@@ -14,7 +14,7 @@ APEX-Core applies a multi-layered testing strategy to guarantee financial correc
          / 5% \        - 1,000 concurrent approvals, race condition defense
         /──────\
        /        \      Integration Tests (Testcontainers)
-      /   25%    \     - Real PostgreSQL, Redpanda, Redis inside Docker
+      /   25%    \     - Real MySQL 8.0, Redpanda, Redis inside Docker
      /────────────\
     /              \   Unit Tests (JUnit 5 + AssertJ + Mockito)
    /      70%       \  - Domain logic, 3-Way Match calculation, SHA-256 Ledger
@@ -78,8 +78,8 @@ class ThreeWayMatchingEngineTest {
 
 ## 3. Integration Testing Standards (Testcontainers)
 
-- **Guiding Principle:** In-memory databases such as H2 are avoided for integration testing; tests execute against real containerized instances of PostgreSQL, Redpanda, and Redis managed by **Testcontainers**.
-- **Rationale:** Verifies PostgreSQL-specific dialects (JSONB outbox columns, schema switching), real Kafka partition assignment, and Redis atomic scripts.
+- **Guiding Principle:** In-memory databases such as H2 are avoided for integration testing; tests execute against real containerized instances of MySQL 8.0, Redpanda, and Redis managed by **Testcontainers**.
+- **Rationale:** Verifies MySQL 8.0-specific dialects (JSON outbox columns, AUTO_INCREMENT, InnoDB transactions), real Kafka partition assignment, and Redis atomic scripts.
 
 ### Standard Base Integration Test Class
 
@@ -89,10 +89,10 @@ class ThreeWayMatchingEngineTest {
 public abstract class BaseIntegrationTest {
 
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("apex_core_db")
-            .withUsername("test_user")
-            .withPassword("test_pass");
+    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0")
+            .withDatabaseName("apex_hris_db")
+            .withUsername("apex_user")
+            .withPassword("apex_password");
 
     @Container
     static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
@@ -100,9 +100,9 @@ public abstract class BaseIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.url", mysql::getJdbcUrl);
+        registry.add("spring.datasource.username", mysql::getUsername);
+        registry.add("spring.datasource.password", mysql::getPassword);
         registry.add("spring.data.redis.host", redis::getHost);
         registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
     }
@@ -116,7 +116,7 @@ public abstract class BaseIntegrationTest {
 | Component / Scenario                 | Mock Allowed?  | Recommended Approach                                                                                                            |
 | :----------------------------------- | :------------: | :------------------------------------------------------------------------------------------------------------------------------ |
 | **Domain Logic & Entities**          |     **NO**     | Test directly using real domain object instances.                                                                               |
-| **Database Repositories**            | **RESTRICTED** | Mock only in isolated service-level unit tests. In integration tests, use real PostgreSQL via Testcontainers.                   |
+| **Database Repositories**            | **RESTRICTED** | Mock only in isolated service-level unit tests. In integration tests, use real MySQL 8.0 via Testcontainers.                   |
 | **Message Broker (Kafka/Redpanda)**  | **RESTRICTED** | Mock `KafkaTemplate` in unit tests. For Saga flows, use real broker containers to validate serialization and event consumption. |
 | **Third-Party APIs (Banking / Tax)** |    **YES**     | Use **WireMock** to simulate external HTTP responses (200, 429, 500, network timeouts).                                         |
 

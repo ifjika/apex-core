@@ -31,9 +31,9 @@ flowchart TD
         Gateway -->|"Proxy /api/v1/procurement/*"| PROC["apex-procurement-service (Port 8082)\n[PR, PO State Machine, Vendors]"]
         Gateway -->|"Proxy /api/v1/finance/*"| FIN["apex-finance-service (Port 8083)\n[3-Way Match, Cryptographic Ledger, AP]"]
 
-        HRIS -->|"Read/Write"| DB_HRIS[("PostgreSQL\nSchema: hris")]
-        PROC -->|"Read/Write + Outbox"| DB_PROC[("PostgreSQL\nSchema: procurement")]
-        FIN -->|"Read/Write + Outbox"| DB_FIN[("PostgreSQL\nSchema: finance")]
+        HRIS -->|"Read/Write"| DB_HRIS[("MySQL 8.0\nDB: apex_hris_db")]
+        PROC -->|"Read/Write + Outbox"| DB_PROC[("MySQL 8.0\nDB: apex_procurement_db")]
+        FIN -->|"Read/Write + Outbox"| DB_FIN[("MySQL 8.0\nDB: apex_finance_db")]
         
         PROC -.->|"Outbox Poller / CDC"| Broker
         FIN -.->|"Outbox Poller / CDC"| Broker
@@ -93,36 +93,41 @@ apex-core/
 │   ├── IMPLEMENTATION_PLAN.md           # Roadmap & task checklist
 │   └── TESTING_GUIDE.md                 # Testing standards & mock rules
 ├── deploy/                              # Local & staging infrastructure
-│   ├── docker-compose.yml               # Postgres, Redis, Redpanda containers
+│   ├── docker-compose.yml               # MySQL 8.0, Redis, Redpanda containers
 │   └── init-db/
-│       └── 01-create-schemas.sql        # Creates hris, procurement, finance schemas
-├── apex-common-core/                    # Shared library across services
-│   ├── pom.xml
-│   └── src/main/java/com/apex/common/
-│       ├── domain/                      # Value Objects (Money, EventEnvelope)
-│       ├── exception/                   # Global RFC 7807 Error Handlers
-│       ├── idempotency/                 # Redis Idempotent Consumer Aspect
-│       └── outbox/                      # Generic Transactional Outbox Entity & Repository
-├── apex-gateway/                        # Spring Cloud Gateway (Port 8080)
-│   ├── pom.xml
-│   └── src/main/
-│       ├── java/com/apex/gateway/       # Route Predicates, JWT Auth Filter, RateLimiter
-│       └── resources/application.yml
-├── apex-hris-service/                   # HR & Org Hierarchy Service (Port 8081)
-│   ├── pom.xml
-│   └── src/main/
-│       ├── java/com/apex/hris/          # Employees, CostCenters, ApprovalMatrix Engine
-│       └── resources/db/migration/      # Flyway SQL migrations (schema: hris)
-├── apex-procurement-service/            # Procurement & PO Service (Port 8082)
-│   ├── pom.xml
-│   └── src/main/
-│       ├── java/com/apex/procurement/   # PR, PO, Vendors, State Machine, Outbox Worker
-│       └── resources/db/migration/      # Flyway SQL migrations (schema: procurement)
-├── apex-finance-service/                # Accounts Payable & GL Service (Port 8083)
-│   ├── pom.xml
-│   └── src/main/
-│       ├── java/com/apex/finance/       # 3-Way Matching Engine, Cryptographic GL, Vouchers
-│       └── resources/db/migration/      # Flyway SQL migrations (schema: finance)
+│       └── 01-create-schemas.sql        # Creates apex_hris_db, apex_procurement_db, apex_finance_db
+├── apex-ui/                             # Enterprise Frontend (React 18 + Vite + TypeScript)
+│   ├── src/                             # P2P & In-House Banking Treasury Dashboard
+│   └── package.json
+├── services/                            # Distributed Backend Microservices (Spring Boot 3.3, Java 21)
+│   ├── apex-common-core/                # Shared library across services
+│   │   ├── pom.xml
+│   │   └── src/main/java/com/apex/common/
+│   │       ├── domain/                  # Value Objects (Money, EventEnvelope)
+│   │       ├── exception/               # Global RFC 7807 Error Handlers
+│   │       ├── idempotency/             # Redis Idempotent Consumer Aspect
+│   │       └── outbox/                  # Generic Transactional Outbox Entity & Repository
+│   ├── apex-gateway/                    # Spring Cloud Gateway (Port 8080)
+│   │   ├── pom.xml
+│   │   └── src/main/
+│   │       ├── java/com/apex/gateway/   # Route Predicates, JWT Auth Filter, RateLimiter
+│   │       └── resources/application.yml
+│   ├── apex-hris-service/               # HR & Org Hierarchy Service (Port 8081)
+│   │   ├── pom.xml
+│   │   └── src/main/
+│   │       ├── java/com/apex/hris/      # Employees, CostCenters, ApprovalMatrix Engine
+│   │       └── resources/db/migration/  # Flyway SQL migrations (schema: hris)
+│   ├── apex-procurement-service/        # Procurement & PO Service (Port 8082)
+│   │   ├── pom.xml
+│   │   └── src/main/
+│   │       ├── java/com/apex/procurement/# PR, PO, Vendors, State Machine, Outbox Worker
+│   │       └── resources/db/migration/  # Flyway SQL migrations (schema: procurement)
+│   └── apex-finance-service/            # Accounts Payable, Cryptographic GL & Treasury Holding (Port 8083)
+│       ├── pom.xml
+│       └── src/main/
+│           ├── java/com/apex/finance/   # 3-Way Match, SHA-256 GL, Treasury In-House Bank
+│           └── resources/db/migration/  # Flyway SQL migrations (schema: finance)
+├── mvnw & mvnw.cmd                      # Portable Apache Maven Wrapper (Java 21 LTS)
 └── pom.xml                              # Root Parent POM (Java 21, Spring Boot 3.3.x BOM)
 ```
 
@@ -137,7 +142,7 @@ Maximum Memory Allocation Budget (Target: ~1.85 GB RAM Total):
 ┌──────────────────────────────────────┬───────────────────────┐
 │ Component                            │ Maximum Memory Limit  │
 ├──────────────────────────────────────┼───────────────────────┤
-│ PostgreSQL 16 (Multi Logical Schema) │ 200 MB                │
+│ MySQL 8.0 (Multi Database)           │ 250 MB                │
 │ Redis 7 In-Memory Cache              │ 80 MB                 │
 │ Redpanda (Kafka Drop-in C++)         │ 300 MB                │
 │ Spring Cloud Gateway                 │ 192 MB (Heap: 128 MB) │

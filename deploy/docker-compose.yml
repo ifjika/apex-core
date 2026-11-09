@@ -1,25 +1,43 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  # Multi-tenant Shared Database via Logical Schemas (Memory Limit: 200MB)
-  postgres-apex:
-    image: postgres:16-alpine
-    container_name: apex-postgres
+  # Enterprise Relational Database: MySQL 8.0 Cluster (Memory Limit: 250MB)
+  mysql-apex:
+    image: mysql:8.0
+    container_name: apex-mysql
+    command:
+      - mysqld
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --innodb-buffer-pool-size=96M
+      - --max-connections=100
     environment:
-      POSTGRES_USER: apex_admin
-      POSTGRES_PASSWORD: secure_dev_password
-      POSTGRES_DB: apex_core_db
+      MYSQL_ROOT_PASSWORD: secure_dev_password
+      MYSQL_DATABASE: apex_core_db
+      MYSQL_USER: apex_admin
+      MYSQL_PASSWORD: secure_dev_password
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
       - ./init-db:/docker-entrypoint-initdb.d
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     deploy:
       resources:
         limits:
-          memory: 200M
+          memory: 250M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U apex_admin -d apex_core_db"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "apex_admin",
+          "-psecure_dev_password",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -28,7 +46,14 @@ services:
   redis-cache:
     image: redis:7-alpine
     container_name: apex-redis
-    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    command:
+      [
+        "redis-server",
+        "--maxmemory",
+        "64mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
     ports:
       - "6379:6379"
     deploy:
@@ -62,5 +87,4 @@ services:
           memory: 300M
 
 volumes:
-  postgres_data:
-
+  mysql_data:

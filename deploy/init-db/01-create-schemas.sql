@@ -1,10 +1,15 @@
--- Initialize Logical Schemas for APEX-Core Microservices Cluster
-CREATE SCHEMA IF NOT EXISTS hris;
-CREATE SCHEMA IF NOT EXISTS procurement;
-CREATE SCHEMA IF NOT EXISTS finance;
+-- =============================================================================
+-- APEX-Core MySQL 8.0 Multi-Database Initialization Script
+-- Implements Database-per-Service Bounded Contexts
+-- =============================================================================
 
--- Grant schema permissions
-GRANT ALL ON SCHEMA hris TO apex_admin;
-GRANT ALL ON SCHEMA procurement TO apex_admin;
-GRANT ALL ON SCHEMA finance TO apex_admin;
+CREATE DATABASE IF NOT EXISTS apex_hris_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS apex_procurement_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS apex_finance_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- Grant permissions to microservice application user
+GRANT ALL PRIVILEGES ON apex_hris_db.* TO 'apex_admin'@'%';
+GRANT ALL PRIVILEGES ON apex_procurement_db.* TO 'apex_admin'@'%';
+GRANT ALL PRIVILEGES ON apex_finance_db.* TO 'apex_admin'@'%';
+
+FLUSH PRIVILEGES;

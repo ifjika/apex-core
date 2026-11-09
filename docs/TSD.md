@@ -6,69 +6,79 @@
 
 ## 1. Database Architecture & Schemas
 
-APEX-Core utilizes PostgreSQL 16 with **Logical Schemas** to maintain bounded-context isolation within a single, memory-efficient database container (memory limit: 200MB):
+APEX-Core utilizes **MySQL 8.0** with independent logical databases to enforce bounded-context isolation within a single, memory-optimized database container (capped at 250MB RAM):
 
-- Schema `hris`: Owned by `apex-hris-service`.
-- Schema `procurement`: Owned by `apex-procurement-service`.
-- Schema `finance`: Owned by `apex-finance-service`.
+- Database `apex_hris_db`: Owned by `apex-hris-service`.
+- Database `apex_procurement_db`: Owned by `apex-procurement-service`.
+- Database `apex_finance_db`: Owned by `apex-finance-service`.
+
+All tables are built with the `InnoDB` storage engine using `utf8mb4` character set and `utf8mb4_unicode_ci` collation.
 
 ---
 
-### 1.1. Schema: `hris` (Organizational Domain)
+### 1.1. Database: `apex_hris_db` (Organizational Domain)
 
 ```sql
-CREATE SCHEMA IF NOT EXISTS hris;
+CREATE DATABASE IF NOT EXISTS apex_hris_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE apex_hris_db;
 
-CREATE TABLE hris.departments (
+CREATE TABLE IF NOT EXISTS departments (
     id VARCHAR(36) PRIMARY KEY,
     code VARCHAR(32) NOT NULL UNIQUE,
     name VARCHAR(128) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE hris.cost_centers (
+CREATE TABLE IF NOT EXISTS cost_centers (
     id VARCHAR(36) PRIMARY KEY,
-    department_id VARCHAR(36) NOT NULL REFERENCES hris.departments(id),
+    department_id VARCHAR(36) NOT NULL,
     code VARCHAR(32) NOT NULL UNIQUE,
     name VARCHAR(128) NOT NULL,
-    allocated_budget NUMERIC(19, 4) NOT NULL CHECK (allocated_budget >= 0),
-    reserved_budget NUMERIC(19, 4) NOT NULL DEFAULT 0.0000 CHECK (reserved_budget >= 0),
-    spent_budget NUMERIC(19, 4) NOT NULL DEFAULT 0.0000 CHECK (spent_budget >= 0),
+    allocated_budget DECIMAL(19, 4) NOT NULL,
+    reserved_budget DECIMAL(19, 4) NOT NULL DEFAULT 0.0000,
+    spent_budget DECIMAL(19, 4) NOT NULL DEFAULT 0.0000,
     version BIGINT NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_cost_centers_dept FOREIGN KEY (department_id) REFERENCES departments(id),
+    CONSTRAINT chk_allocated_positive CHECK (allocated_budget >= 0),
+    CONSTRAINT chk_reserved_positive CHECK (reserved_budget >= 0),
+    CONSTRAINT chk_spent_positive CHECK (spent_budget >= 0),
     CONSTRAINT chk_budget_consistency CHECK (reserved_budget + spent_budget <= allocated_budget)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE hris.employees (
+CREATE TABLE IF NOT EXISTS employees (
     id VARCHAR(36) PRIMARY KEY,
     employee_code VARCHAR(32) NOT NULL UNIQUE,
     email VARCHAR(128) NOT NULL UNIQUE,
     full_name VARCHAR(128) NOT NULL,
-    department_id VARCHAR(36) NOT NULL REFERENCES hris.departments(id),
-    supervisor_id VARCHAR(36) REFERENCES hris.employees(id),
+    department_id VARCHAR(36) NOT NULL,
+    supervisor_id VARCHAR(36),
     approval_role VARCHAR(32) NOT NULL, -- e.g. SUPERVISOR, DEPT_MANAGER, DIVISION_DIRECTOR
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_employees_dept FOREIGN KEY (department_id) REFERENCES departments(id),
+    CONSTRAINT fk_employees_supervisor FOREIGN KEY (supervisor_id) REFERENCES employees(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE hris.approval_matrices (
+CREATE TABLE IF NOT EXISTS approval_matrices (
     id VARCHAR(36) PRIMARY KEY,
     role VARCHAR(32) NOT NULL,
-    min_amount NUMERIC(19, 4) NOT NULL,
-    max_amount NUMERIC(19, 4), -- NULL represents unlimited
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    min_amount DECIMAL(19, 4) NOT NULL,
+    max_amount DECIMAL(19, 4), -- NULL represents unlimited
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 ---
 
-### 1.2. Schema: `procurement` (Purchasing & Ingestion Domain)
+### 1.2. Database: `apex_procurement_db` (Purchasing & Ingestion Domain)
 
 ```sql
-CREATE SCHEMA IF NOT EXISTS procurement;
+CREATE DATABASE IF NOT EXISTS apex_procurement_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE apex_procurement_db;
 
-CREATE TABLE procurement.vendors (
+CREATE TABLE IF NOT EXISTS vendors (
     id VARCHAR(36) PRIMARY KEY,
     code VARCHAR(32) NOT NULL UNIQUE,
     name VARCHAR(128) NOT NULL,
@@ -76,137 +86,192 @@ CREATE TABLE procurement.vendors (
     bank_account_number VARCHAR(64) NOT NULL,
     bank_name VARCHAR(64) NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE procurement.purchase_requisitions (
+CREATE TABLE IF NOT EXISTS purchase_requisitions (
     id VARCHAR(36) PRIMARY KEY,
     pr_number VARCHAR(64) NOT NULL UNIQUE,
     cost_center_id VARCHAR(36) NOT NULL,
     requester_id VARCHAR(36) NOT NULL,
     current_approver_id VARCHAR(36),
     status VARCHAR(32) NOT NULL, -- DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, ORDERED
-    total_amount NUMERIC(19, 4) NOT NULL DEFAULT 0.0000,
+    total_amount DECIMAL(19, 4) NOT NULL DEFAULT 0.0000,
     currency VARCHAR(3) NOT NULL DEFAULT 'IDR',
     rejection_reason TEXT,
     version BIGINT NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE procurement.pr_line_items (
+CREATE TABLE IF NOT EXISTS pr_line_items (
     id VARCHAR(36) PRIMARY KEY,
-    requisition_id VARCHAR(36) NOT NULL REFERENCES procurement.purchase_requisitions(id) ON DELETE CASCADE,
+    requisition_id VARCHAR(36) NOT NULL,
     item_name VARCHAR(128) NOT NULL,
     description TEXT,
-    quantity INTEGER NOT NULL CHECK (quantity > 0),
-    unit_price NUMERIC(19, 4) NOT NULL CHECK (unit_price > 0),
-    subtotal NUMERIC(19, 4) NOT NULL CHECK (subtotal > 0),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    quantity INT NOT NULL,
+    unit_price DECIMAL(19, 4) NOT NULL,
+    subtotal DECIMAL(19, 4) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_pr_line_requisition FOREIGN KEY (requisition_id) REFERENCES purchase_requisitions(id) ON DELETE CASCADE,
+    CONSTRAINT chk_pr_qty_pos CHECK (quantity > 0),
+    CONSTRAINT chk_pr_price_pos CHECK (unit_price > 0),
+    CONSTRAINT chk_pr_subtotal_pos CHECK (subtotal > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE procurement.purchase_orders (
+CREATE TABLE IF NOT EXISTS purchase_orders (
     id VARCHAR(36) PRIMARY KEY,
     po_number VARCHAR(64) NOT NULL UNIQUE,
     requisition_id VARCHAR(36) NOT NULL,
-    vendor_id VARCHAR(36) NOT NULL REFERENCES procurement.vendors(id),
+    vendor_id VARCHAR(36) NOT NULL,
     status VARCHAR(32) NOT NULL, -- ISSUED, ACKNOWLEDGED, PARTIALLY_FULFILLED, FULFILLED, CANCELLED
-    total_amount NUMERIC(19, 4) NOT NULL,
+    total_amount DECIMAL(19, 4) NOT NULL,
     currency VARCHAR(3) NOT NULL DEFAULT 'IDR',
     version BIGINT NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_po_vendor FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE procurement.po_line_items (
+CREATE TABLE IF NOT EXISTS po_line_items (
     id VARCHAR(36) PRIMARY KEY,
-    purchase_order_id VARCHAR(36) NOT NULL REFERENCES procurement.purchase_orders(id) ON DELETE CASCADE,
+    purchase_order_id VARCHAR(36) NOT NULL,
     pr_line_item_id VARCHAR(36) NOT NULL,
     item_name VARCHAR(128) NOT NULL,
-    quantity INTEGER NOT NULL CHECK (quantity > 0),
-    unit_price NUMERIC(19, 4) NOT NULL CHECK (unit_price > 0),
-    subtotal NUMERIC(19, 4) NOT NULL CHECK (subtotal > 0)
-);
+    quantity INT NOT NULL,
+    unit_price DECIMAL(19, 4) NOT NULL,
+    subtotal DECIMAL(19, 4) NOT NULL,
+    CONSTRAINT fk_po_line_po FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    CONSTRAINT chk_po_qty_pos CHECK (quantity > 0),
+    CONSTRAINT chk_po_price_pos CHECK (unit_price > 0),
+    CONSTRAINT chk_po_subtotal_pos CHECK (subtotal > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE procurement.outbox_events (
+CREATE TABLE IF NOT EXISTS outbox_events (
     id VARCHAR(36) PRIMARY KEY,
     aggregate_type VARCHAR(64) NOT NULL,
     aggregate_id VARCHAR(64) NOT NULL,
     event_type VARCHAR(128) NOT NULL,
-    payload JSONB NOT NULL,
+    payload JSON NOT NULL,
     published BOOLEAN NOT NULL DEFAULT FALSE,
-    retry_count INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    published_at TIMESTAMPTZ
-);
-CREATE INDEX idx_proc_outbox_unpub ON procurement.outbox_events (published, created_at) WHERE published = FALSE;
+    retry_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    published_at TIMESTAMP(6) NULL,
+    INDEX idx_outbox_unpub (published, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 ---
 
-### 1.3. Schema: `finance` (Settlement & Cryptographic Ledger Domain)
+### 1.3. Database: `apex_finance_db` (Settlement & Cryptographic Ledger Domain)
 
 ```sql
-CREATE SCHEMA IF NOT EXISTS finance;
+CREATE DATABASE IF NOT EXISTS apex_finance_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE apex_finance_db;
 
-CREATE TABLE finance.goods_receipts (
+CREATE TABLE IF NOT EXISTS goods_receipts (
     id VARCHAR(36) PRIMARY KEY,
     gr_number VARCHAR(64) NOT NULL UNIQUE,
     purchase_order_id VARCHAR(36) NOT NULL,
     received_by VARCHAR(36) NOT NULL,
-    received_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    received_date TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE finance.gr_line_items (
+CREATE TABLE IF NOT EXISTS gr_line_items (
     id VARCHAR(36) PRIMARY KEY,
-    goods_receipt_id VARCHAR(36) NOT NULL REFERENCES finance.goods_receipts(id) ON DELETE CASCADE,
+    goods_receipt_id VARCHAR(36) NOT NULL,
     po_line_item_id VARCHAR(36) NOT NULL,
-    received_quantity INTEGER NOT NULL CHECK (received_quantity >= 0)
-);
+    received_quantity INT NOT NULL,
+    CONSTRAINT fk_gr_line_gr FOREIGN KEY (goods_receipt_id) REFERENCES goods_receipts(id) ON DELETE CASCADE,
+    CONSTRAINT chk_gr_qty_non_neg CHECK (received_quantity >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE finance.vendor_invoices (
+CREATE TABLE IF NOT EXISTS vendor_invoices (
     id VARCHAR(36) PRIMARY KEY,
     invoice_number VARCHAR(64) NOT NULL UNIQUE,
     vendor_id VARCHAR(36) NOT NULL,
     purchase_order_id VARCHAR(36) NOT NULL,
     goods_receipt_id VARCHAR(36) NOT NULL,
     status VARCHAR(32) NOT NULL, -- PENDING_MATCH, MATCHED, DISCREPANCY, PAID
-    tax_amount NUMERIC(19, 4) NOT NULL DEFAULT 0.0000,
-    total_amount NUMERIC(19, 4) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    tax_amount DECIMAL(19, 4) NOT NULL DEFAULT 0.0000,
+    total_amount DECIMAL(19, 4) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE finance.vi_line_items (
+CREATE TABLE IF NOT EXISTS vi_line_items (
     id VARCHAR(36) PRIMARY KEY,
-    vendor_invoice_id VARCHAR(36) NOT NULL REFERENCES finance.vendor_invoices(id) ON DELETE CASCADE,
+    vendor_invoice_id VARCHAR(36) NOT NULL,
     po_line_item_id VARCHAR(36) NOT NULL,
-    invoiced_quantity INTEGER NOT NULL CHECK (invoiced_quantity > 0),
-    unit_price NUMERIC(19, 4) NOT NULL CHECK (unit_price > 0),
-    subtotal NUMERIC(19, 4) NOT NULL CHECK (subtotal > 0)
-);
+    invoiced_quantity INT NOT NULL,
+    unit_price DECIMAL(19, 4) NOT NULL,
+    subtotal DECIMAL(19, 4) NOT NULL,
+    CONSTRAINT fk_vi_line_invoice FOREIGN KEY (vendor_invoice_id) REFERENCES vendor_invoices(id) ON DELETE CASCADE,
+    CONSTRAINT chk_vi_qty_pos CHECK (invoiced_quantity > 0),
+    CONSTRAINT chk_vi_price_pos CHECK (unit_price > 0),
+    CONSTRAINT chk_vi_subtotal_pos CHECK (subtotal > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE finance.payment_vouchers (
+CREATE TABLE IF NOT EXISTS payment_vouchers (
     id VARCHAR(36) PRIMARY KEY,
     voucher_number VARCHAR(64) NOT NULL UNIQUE,
-    invoice_id VARCHAR(36) NOT NULL REFERENCES finance.vendor_invoices(id),
-    amount NUMERIC(19, 4) NOT NULL,
+    invoice_id VARCHAR(36) NOT NULL,
+    amount DECIMAL(19, 4) NOT NULL,
     status VARCHAR(32) NOT NULL, -- ISSUED, DISBURSED, CANCELLED
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT fk_voucher_invoice FOREIGN KEY (invoice_id) REFERENCES vendor_invoices(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Cryptographically chained append-only general ledger
-CREATE TABLE finance.ledger_entries (
+CREATE TABLE IF NOT EXISTS ledger_entries (
     id VARCHAR(36) PRIMARY KEY,
-    sequence_number BIGSERIAL NOT NULL UNIQUE,
+    sequence_number BIGINT AUTO_INCREMENT UNIQUE,
     transaction_reference VARCHAR(64) NOT NULL, -- e.g. Voucher ID or PO ID
-    account_code VARCHAR(32) NOT NULL,          -- e.g. 1101 (Cash), 2101 (AP)
-    entry_type VARCHAR(6) NOT NULL CHECK (entry_type IN ('DEBIT', 'CREDIT')),
-    amount NUMERIC(19, 4) NOT NULL CHECK (amount > 0),
+    account_code VARCHAR(32) NOT NULL,          -- e.g. 1101 (Cash), 2101 (AP), 5101 (Inventory)
+    entry_type VARCHAR(6) NOT NULL,             -- DEBIT, CREDIT
+    amount DECIMAL(19, 4) NOT NULL,
     previous_hash VARCHAR(64) NOT NULL,
     current_hash VARCHAR(64) NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX idx_ledger_seq ON finance.ledger_entries(sequence_number);
+    timestamp TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    INDEX idx_ledger_seq (sequence_number),
+    CONSTRAINT chk_entry_type CHECK (entry_type IN ('DEBIT', 'CREDIT')),
+    CONSTRAINT chk_ledger_amount CHECK (amount > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+---
+
+### 1.4. Database: `apex_finance_db` (Treasury Holding & In-House Banking)
+
+```sql
+-- Subsidiary Cash Pooling Accounts (Managed by Holding)
+CREATE TABLE IF NOT EXISTS treasury_cash_pools (
+    id VARCHAR(36) PRIMARY KEY,
+    subsidiary_code VARCHAR(32) NOT NULL UNIQUE,
+    subsidiary_name VARCHAR(128) NOT NULL,
+    current_balance DECIMAL(19, 4) NOT NULL DEFAULT 0.0000,
+    yield_rate DECIMAL(5, 4) NOT NULL DEFAULT 0.0600, -- 6.00% p.a. deposit yield paid by holding
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Intercompany Working Capital Loan Contracts
+CREATE TABLE IF NOT EXISTS intercompany_loans (
+    id VARCHAR(36) PRIMARY KEY,
+    loan_reference VARCHAR(64) NOT NULL UNIQUE,
+    borrower_subsidiary VARCHAR(32) NOT NULL,
+    lender_subsidiary VARCHAR(32) NOT NULL,
+    purchase_requisition_id VARCHAR(36),
+    principal_amount DECIMAL(19, 4) NOT NULL,
+    interest_rate DECIMAL(5, 4) NOT NULL DEFAULT 0.0850, -- 8.50% p.a. charged to borrower
+    spread_rate DECIMAL(5, 4) NOT NULL DEFAULT 0.0250,   -- 2.50% p.a. Net Interest Margin (NIM) to holding
+    tenor_months INT NOT NULL DEFAULT 6,
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    total_interest_projected DECIMAL(19, 4) NOT NULL,
+    holding_margin_projected DECIMAL(19, 4) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT chk_loan_principal CHECK (principal_amount > 0),
+    CONSTRAINT chk_loan_tenor CHECK (tenor_months > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 ---

@@ -27,7 +27,7 @@ APEX-Core applies the **Database-per-Service** pattern to enforce strict data is
    └─────────────┬─────────────┘    └─────────────┬─────────────┘    └─────────────┬─────────────┘
                  │                                │                                │
                  ▼                                ▼                                ▼
-        [(PostgreSQL DB 1)]              [(PostgreSQL DB 2)]              [(PostgreSQL DB 3)]
+        [(MySQL: apex_hris_db)]       [(MySQL: apex_procurement_db)]   [(MySQL: apex_finance_db)]
                  │                                │                                │
                  │                                │ (Transactional Outbox)         │
                  │                                ▼                                │
@@ -54,13 +54,14 @@ APEX-Core applies the **Database-per-Service** pattern to enforce strict data is
   - Finite State Machine engine governing the procurement lifecycle (`DRAFT` $\rightarrow$ `PENDING_APPROVAL` $\rightarrow$ `APPROVED` $\rightarrow$ `ORDERED` $\rightarrow$ `FULFILLED`).
 - **Core Data Models:** `PurchaseRequisition`, `PurchaseOrder`, `POLineItem`, `Vendor`.
 
-### 3.3. apex-finance-service (Settlement & Accounts Payable)
+### 3.3. apex-finance-service (Settlement, Accounts Payable & Treasury Holding)
 
 - **Responsibilities:**
   - **3-Way Matching Invariant:** Automated multi-point validation across **Purchase Order (PO)**, warehouse **Goods Receipt (GR)**, and **Vendor Invoice (VI)**.
     $$\text{Status Valid} \iff (\text{Qty}_{\text{PO}} = \text{Qty}_{\text{GR}} = \text{Qty}_{\text{VI}}) \land (\text{Price}_{\text{PO}} = \text{Price}_{\text{VI}})$$
-  - Append-only double-entry general ledger journal entries.
-- **Core Data Models:** `VendorInvoice`, `GoodsReceipt`, `PaymentVoucher`, `LedgerEntry`.
+  - Append-only double-entry general ledger journal entries sealed with SHA-256 hash chains.
+  - **In-House Banking & Treasury Holding Engine:** Subsidiary cash pooling, automated working capital liquidity requests, and intercompany loans earning 2.50% p.a. Net Interest Margin (NIM) under OECD/DJP arm's length transfer pricing standards.
+- **Core Data Models:** `VendorInvoice`, `GoodsReceipt`, `PaymentVoucher`, `LedgerEntry`, `TreasuryCashPool`, `IntercompanyLoan`.
 
 ## 4. Distributed Transaction & Data Integrity Patterns
 
@@ -104,20 +105,26 @@ APEX-Core is engineered to run on a local workstation with 8 GB RAM using resour
 version: "3.8"
 
 services:
-  # Multi-tenant Shared Database via Logical Schemas
-  postgres-apex:
-    image: postgres:16-alpine
-    container_name: apex-postgres
+  # Multi-database MySQL 8.0 (Low-footprint InnoDB buffer pool)
+  mysql-apex:
+    image: mysql:8.0
+    container_name: apex-mysql
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --innodb-buffer-pool-size=96M
+      - --max-connections=50
     environment:
-      POSTGRES_USER: apex_admin
-      POSTGRES_PASSWORD: secure_dev_password
-      POSTGRES_DB: apex_core_db
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_USER: apex_user
+      MYSQL_PASSWORD: apex_password
     ports:
-      - "5432:5432"
+      - "3306:3306"
+    volumes:
+      - ./init-db:/docker-entrypoint-initdb.d
     deploy:
       resources:
         limits:
-          memory: 200M
+          memory: 250M
 
   # In-Memory Cache & Distributed Lock Store
   redis-cache:
@@ -172,6 +179,6 @@ _Total memory consumption for all 3 microservices + Docker infrastructure ranges
 
 ## 7. Quality Assurance & Benchmarking Strategy
 
-1. **Automated Integration Testing:** Uses **Testcontainers** to validate asynchronous Saga choreography against real Docker-managed PostgreSQL and Redpanda instances.
+1. **Automated Integration Testing:** Uses **Testcontainers** to validate asynchronous Saga choreography against real Docker-managed MySQL 8.0 and Redpanda instances.
 2. **Concurrency Stress Testing (k6):** Validates optimistic locking resilience under 1,000 concurrent approval attempts without ledger anomalies.
 3. **OpenAPI Federation:** Unified API catalog aggregated through Spring Cloud Gateway.

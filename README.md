@@ -4,12 +4,12 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3%2B-6DB33F?style=flat&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Architecture](https://img.shields.io/badge/Architecture-Event--Driven%20Microservices-orange?style=flat)]()
 [![Messaging](https://img.shields.io/badge/Messaging-Redpanda%20%7C%20Kafka-red?style=flat&logo=apachekafka)](https://redpanda.com/)
-[![Database](https://img.shields.io/badge/Database-PostgreSQL%2016%20%7C%20Redis%207-blue?style=flat&logo=postgresql)](https://www.postgresql.org/)
+[![Database](https://img.shields.io/badge/Database-MySQL%208.0%20%7C%20Redis%207-blue?style=flat&logo=mysql)](https://www.mysql.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **APEX-Core** (*Asynchronous Procurement & Enterprise Exchange Core*) is a high-performance, distributed **Procurement-to-Pay (P2P)** enterprise backend engine engineered in **Java 21** and **Spring Boot 3.3+**. It orchestrates mission-critical enterprise workflows connecting **Organizational HRIS** (approval limits & cost center allocations), **Procurement Lifecycle Management** (PR-to-PO state machines), and **Financial Accounts Payable (AP)**.
 
-The platform guarantees distributed data consistency via the **Transactional Outbox Pattern**, choreography-based **Saga Transactions**, automated **3-Way Matching Engine** (Purchase Order $\iff$ Goods Receipt $\iff$ Vendor Invoice), and tamper-evident **SHA-256 cryptographic general ledgers**—engineered to run seamlessly within a local **8 GB RAM workstation** (~1.85 GB footprint) using containerized PostgreSQL, Redis, and Redpanda.
+The platform guarantees distributed data consistency via the **Transactional Outbox Pattern**, choreography-based **Saga Transactions**, automated **3-Way Matching Engine** (Purchase Order $\iff$ Goods Receipt $\iff$ Vendor Invoice), and tamper-evident **SHA-256 cryptographic general ledgers**—engineered to run seamlessly within a local **8 GB RAM workstation** (~1.85 GB footprint) using containerized MySQL 8.0, Redis, and Redpanda.
 
 ---
 
@@ -34,7 +34,7 @@ I engineered this project as an end-to-end deep dive into **Enterprise Resource 
 
 ### 2. Transactional Outbox Pattern & Zero Dual-Write Anomaly
 
-- **Atomic State Transitions**: Business mutations and outbound event messages are committed within a **single local PostgreSQL transaction** (`@Transactional`).
+- **Atomic State Transitions**: Business mutations and outbound event messages are committed within a **single local MySQL transaction** (`@Transactional`).
 - **Reliable Event Streaming**: A dedicated background polling worker consumes uncommitted rows from `outbox_events` and dispatches them to **Redpanda (Apache Kafka protocol)** with strict *At-Least-Once Delivery* guarantees.
 
 ### 3. Choreography-Based Saga Distributed Transactions
@@ -90,7 +90,7 @@ I engineered this project as an end-to-end deep dive into **Enterprise Resource 
                  │                       │                       │
                  ▼                       ▼                       ▼
        ┌───────────────────┐   ┌───────────────────┐   ┌────────────────────┐
-       │ PostgreSQL (hris) │   │ PostgreSQL (proc) │   │PostgreSQL (finance)│
+       │MySQL(apex_hris_db)│   │MySQL(apex_proc_db)│   │MySQL(apex_fin_db)  │
        └─────────┬─────────┘   └─────────┬─────────┘   └─────────┬──────────┘
                  │                       │                       │
                  │               Transactional Outbox                    │
@@ -120,36 +120,31 @@ I engineered this project as an end-to-end deep dive into **Enterprise Resource 
 
 ```text
 apex-core/
-├── apex-common-core/                    # Shared Domain Models, Money VO, Outbox Base & RFC 7807 Handlers
-│   ├── src/main/java/com/apex/common/domain/        # Immutable Money Value Object, EventEnvelope<T>
-│   ├── src/main/java/com/apex/common/exception/     # Global ProblemDetails RFC 7807 Error Handlers
-│   └── src/main/java/com/apex/common/idempotency/   # Redis-backed Idempotency Interceptor
-├── apex-gateway/                        # Spring Cloud Gateway (Port 8080)
-│   ├── src/main/java/com/apex/gateway/filter/       # JWT Auth Filter, Rate Limiter & Reverse Proxy
-│   └── src/main/resources/application.yml
-├── apex-hris-service/                   # Organizational Governance & Matrix Service (Port 8081)
-│   ├── src/main/java/com/apex/hris/                 # Employee Registry, Cost Center, Approval Matrix
-│   └── src/main/resources/db/migration/             # Flyway Schema Migrations (schema: hris)
-├── apex-procurement-service/            # Purchasing & PO Ingestion Service (Port 8082)
-│   ├── src/main/java/com/apex/procurement/          # PR-to-PO State Machine, Outbox Poller Worker
-│   └── src/main/resources/db/migration/             # Flyway Schema Migrations (schema: procurement)
-├── apex-finance-service/                # 3-Way Match Engine & Cryptographic Ledger (Port 8083)
-│   ├── src/main/java/com/apex/finance/              # 3-Way Match Algorithm, SHA-256 GL Chain
-│   └── src/main/resources/db/migration/             # Flyway Schema Migrations (schema: finance)
+├── apex-ui/                             # Enterprise Frontend (React 18, Vite, TypeScript, Lucide)
+│   ├── src/                             # P2P & In-House Banking Treasury Dashboard
+│   └── package.json
+├── services/                            # Distributed Backend Microservices (Spring Boot 3.3, Java 21)
+│   ├── apex-common-core/                # Shared Domain Models, Money VO, Outbox Base & RFC 7807 Handlers
+│   │   ├── src/main/java/com/apex/common/domain/        # Immutable Money Value Object, EventEnvelope<T>
+│   │   ├── src/main/java/com/apex/common/exception/     # Global ProblemDetails RFC 7807 Error Handlers
+│   │   └── src/main/java/com/apex/common/idempotency/   # Redis-backed Idempotency Interceptor
+│   ├── apex-gateway/                    # Spring Cloud Gateway (Port 8080)
+│   │   ├── src/main/java/com/apex/gateway/filter/       # JWT Auth Filter, Rate Limiter & Reverse Proxy
+│   │   └── src/main/resources/application.yml
+│   ├── apex-hris-service/               # Organizational Governance & Matrix Service (Port 8081)
+│   │   ├── src/main/java/com/apex/hris/                 # Employee Registry, Cost Center, Approval Matrix
+│   │   └── src/main/resources/db/migration/             # Flyway Schema Migrations (schema: hris)
+│   ├── apex-procurement-service/        # Purchasing & PO Ingestion Service (Port 8082)
+│   │   ├── src/main/java/com/apex/procurement/          # PR-to-PO State Machine, Outbox Poller Worker
+│   │   └── src/main/resources/db/migration/             # Flyway Schema Migrations (schema: procurement)
+│   └── apex-finance-service/            # 3-Way Match, Cryptographic Ledger & Treasury Holding (Port 8083)
+│       ├── src/main/java/com/apex/finance/              # 3-Way Match Algorithm, SHA-256 GL Chain, Treasury In-House Bank
+│       └── src/main/resources/db/migration/             # Flyway Schema Migrations (schema: finance)
 ├── deploy/                              # Local Cluster Infrastructure
-│   ├── docker-compose.yml               # PostgreSQL 16, Redis 7, Redpanda Broker (<600MB container RAM)
-│   └── init-db/01-create-schemas.sql    # Multi-schema initialization script
+│   ├── docker-compose.yml               # MySQL 8.0, Redis 7, Redpanda Broker (<600MB container RAM)
+│   └── init-db/01-create-schemas.sql    # Multi-database initialization script
 ├── docs/                                # Enterprise Architectural Documentation Suite
-│   ├── OVERVIEW.md                      # Executive Architecture & Technical Specifications
-│   ├── PRD.md                           # Product Requirements, User Personas & KPIs
-│   ├── ARCHITECTURE.md                  # Deep Architectural Patterns & High-Level Design
-│   ├── TSD.md                           # Database Schemas, 3-Way Match Algorithm & Hash Chain Math
-│   ├── SECURITY_GUIDE.md                # OWASP API Security Mitigation & RBAC Matrix
-│   ├── APP_FLOW.md                      # State Machines & End-to-End Business Sequence Flows
-│   ├── INTEGRATION.md                   # OpenAPI Contracts, CloudEvents Schemas & Webhooks
-│   ├── TESTING_GUIDE.md                 # Testcontainers Testing Suite & k6 Concurrency Benchmarks
-│   ├── DESIGN_SYSTEM.md                 # UI/UX Standards, High-Density Table Rules & Tokens
-│   └── IMPLEMENTATION_PLAN.md           # Engineering Phased Roadmap & Active Work Checklist
+├── mvnw & mvnw.cmd                      # Portable Apache Maven Wrapper (Java 21 LTS)
 ├── pom.xml                              # Root Maven Parent POM (Java 21, Spring Boot 3.3.x BOM)
 └── README.md
 ```
@@ -163,7 +158,7 @@ apex-core/
 | **Language & Platform** | **Java 21 LTS** | Virtual Threads (Project Loom), Pattern Matching, Record Types |
 | **Framework Ecosystem** | **Spring Boot 3.3+ / Cloud 2023** | Enterprise DI, Spring Data JPA, Spring Cloud Gateway |
 | **Architecture** | **Event-Driven Microservices (EDA)** | Domain-Driven Design (DDD), Outbox Pattern & Choreography Saga |
-| **Database of Record** | **PostgreSQL 16 (Logical Schemas)** | Isolated schemas (`hris`, `procurement`, `finance`), JSONB outbox |
+| **Database of Record** | **MySQL 8.0 (Multi-Database)** | Isolated databases (`apex_hris_db`, `apex_procurement_db`, `apex_finance_db`) |
 | **Distributed Messaging** | **Redpanda (Kafka Protocol v24+)** | Low-latency C++ event broker with minimal memory overhead (<300MB) |
 | **Cache & Distributed Lock** | **Redis 7 Alpine** | Idempotency key TTL, Token Bucket rate limiting, and distributed locks |
 | **Schema Migration** | **Flyway 10** | Deterministic version-controlled database schema migrations |
@@ -193,14 +188,14 @@ ls -l docs/
 
 ### 2. Start Local Infrastructure via Docker Compose
 
-Run the memory-optimized infrastructure stack (PostgreSQL, Redis, and Redpanda):
+Run the memory-optimized infrastructure stack (MySQL 8.0, Redis, and Redpanda):
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
 Verify service availability:
-- **PostgreSQL 16**: `localhost:5432` (Database: `apex_core_db`, Schemas: `hris`, `procurement`, `finance`)
+- **MySQL 8.0**: `localhost:3306` (Databases: `apex_hris_db`, `apex_procurement_db`, `apex_finance_db`)
 - **Redis 7**: `localhost:6379`
 - **Redpanda Broker**: `localhost:9092`
 

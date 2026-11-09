@@ -8,7 +8,7 @@
 * **Version:** 1.0.0
 * **Status:** Active Engineering
 * **Target Audience:** Engineering Team, Enterprise Architects, Product Managers, Financial & Compliance Auditors
-* **Core Stack:** Java 21, Spring Boot 3.3+, PostgreSQL 16, Redpanda (Kafka Protocol), Redis 7, Spring Cloud Gateway
+* **Core Stack:** Java 21, Spring Boot 3.3+, MySQL 8.0, Redpanda (Kafka Protocol), Redis 7, Spring Cloud Gateway
 
 ---
 
@@ -153,7 +153,7 @@ APEX-Core Platform
 ## 7. System Constraints & Dependencies
 * **Operating Environment:** Runs on standard workstations (8 GB RAM via Docker Compose) and cloud container clusters.
 * **Core Dependencies:**
-  * Database: PostgreSQL 16+.
+  * Database: MySQL 8.0+.
   * Message Broker: Apache Kafka protocol compatible (Redpanda v24+).
   * Distributed Cache: Redis 7+.
   * Java Runtime: OpenJDK 21 LTS (Virtual Threads enabled).
