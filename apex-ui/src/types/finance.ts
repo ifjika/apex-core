@@ -14,9 +14,9 @@ export interface LedgerEntry {
 }
 
 export interface ChainVerificationResponse {
-  valid: boolean;
-  totalEntriesChecked: number;
-  message: string;
+  totalEntriesVerified: number;
+  isTamperFree: boolean;
+  failureDetails?: string | null;
 }
 
 export interface PaymentVoucher {

@@ -1,4 +1,4 @@
-#!/bin/sh
+r#!/bin/sh
 # ----------------------------------------------------------------------------
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -33,6 +33,11 @@
 #       set MAVEN_OPTS=-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000
 #   MAVEN_SKIP_RC - flag to disable loading of mavenrc files
 # ----------------------------------------------------------------------------
+
+# Default to project's embedded Adoptium Java 21 LTS if JAVA_HOME is not set
+if [ -z "$JAVA_HOME" ]; then
+  export JAVA_HOME="C:/Users/USER/.antigravity/extensions/redhat.java-1.54.0-win32-x64/jre/21.0.10-win32-x86_64"
+fi
 
 if [ -z "$MAVEN_SKIP_RC" ] ; then
 

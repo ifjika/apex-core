@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # Enterprise Relational Database: MySQL 8.0 Cluster (Memory Limit: 250MB)
   mysql-apex:

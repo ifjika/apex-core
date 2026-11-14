@@ -47,6 +47,7 @@ dist/
 **/dist/
 dist-ssr/
 *.local
+*.tsbuildinfo
 .npm/
 .eslintcache
 npm-debug.log*

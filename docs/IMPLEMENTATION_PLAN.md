@@ -14,6 +14,7 @@ This document defines the roadmap, phased feature implementation matrix, and the
 | **8** | **Defensive API Gateway & Ingress Security** | Spring Cloud Gateway, Reactive Redis, JJWT (RS256), Token Bucket Rate Limiter | 🟢 Completed | Reverse proxy routes to microservices; Bearer JWT claims validated and enriched; 100 req/min rate limit enforced. |
 | **9** | **CI/CD Pipeline, Testcontainers & Concurrency Benchmarking** | GitHub Actions, Testcontainers (Kafka + MySQL 8.0), k6 Concurrency (1,000 RPS) | 🟢 Completed | Automated CI pipeline executes build & unit tests; Testcontainers guide and k6 benchmark script validating 1,000 concurrent approvals. |
 | **10** | **Treasury Holding & In-House Banking Engine** | Spring Boot 3.3, MySQL 8.0, SHA-256 Ledger, Liquidity Sweeping, React 18 | 🟢 Completed | Cash pooling across subsidiaries, intercompany loan origination with 2.50% Net Interest Margin (NIM), and double-entry GL ledger posting. |
+| **11** | **Enterprise Multi-Module UI Architecture & Component Modularization** | React 18, TypeScript, Vite, Tailwind CSS, Headless Hooks, AGENT.md Strict Limits | 🟢 Completed | Monolithic App.tsx refactored into Pattern A tabbed shell; 4 isolated domain modules (Treasury, Procurement FSM, HRIS Hierarchy, Finance SHA-256 Ledger) with strict <=150 LOC per component. |
 
 ---
 
@@ -22,33 +23,39 @@ This document defines the roadmap, phased feature implementation matrix, and the
 > [!IMPORTANT]
 > **Checklist Usage Rules:** This section ONLY contains the micro-steps for the feature CURRENTLY in progress. Once all steps below are confirmed and verified, this checklist is cleared, and replaced with the micro-steps of the next feature according to the implementation table above.
 
-### Active Phase: Phase 10 - Treasury Holding & In-House Banking Engine
+### Active Phase: Phase 11 - Enterprise Multi-Module UI Architecture & Component Modularization
 
-- [x] **10.1 Database Schema Migration for Treasury Holding** in `services/apex-finance-service/src/main/resources/db/migration/V2__treasury_holding.sql`:
-  - Define `treasury_cash_pools` table tracking subsidiary liquidity balances and 6.00% p.a. deposit yields.
-  - Define `intercompany_loans` table recording principal amounts, 8.50% p.a. borrowing rates, 2.50% p.a. holding spread margins (NIM), and tenors.
-  - Seed initial conglomerate entities (`SUB-AGRO` surplus lender with IDR 50B, `SUB-MFG` deficit borrower).
+- [x] **11.1 Shell & Navigation Layout** in `apex-ui/src/components/layout/`:
+  - Implemented `TabNavigation.tsx` (49 LOC) and `AppLayout.tsx` (52 LOC) with active module indicator and JWT token status.
+  - Refactored `App.tsx` (19 LOC) from a 450-line monolith into a declarative root shell.
 
-- [x] **10.2 Domain Entities & Repositories** in `services/apex-finance-service/src/main/java/com/apex/finance/domain/`:
-  - Implement `TreasuryCashPool.java` with atomic `deposit()` and `withdraw()` liquidity methods.
-  - Implement `IntercompanyLoan.java` calculating total interest and holding spread margin projections via `HALF_EVEN` rounding.
-  - Create `TreasuryCashPoolRepository.java` and `IntercompanyLoanRepository.java`.
+- [x] **11.2 Headless Custom Hooks & API Alignment** in `apex-ui/src/hooks/` and `src/api/`:
+  - `useTreasury.ts` (100 LOC) — Liquidity sweeping, loan origination, and live NIM margin calculations.
+  - `useProcurement.ts` (122 LOC) — PR creation, state transitions, and outbox simulation.
+  - `useHris.ts` (119 LOC) — Recursive supervisor hierarchy climbing and cost center budget monitoring.
+  - `useLedger.ts` (98 LOC) — SHA-256 hash-chain verification and double-entry tracking.
+  - Fixed contract mismatch in `procurementApi.ts` (`@RequestBody ApprovalActionRequest`).
+  - Fixed verification response mismatch in `types/finance.ts` (`isTamperFree`, `totalEntriesVerified`).
 
-- [x] **10.3 Domain Service & Cryptographic Ledger Integration** in `services/apex-finance-service/src/main/java/com/apex/finance/service/TreasuryHoldingService.java`:
-  - Implement `originateLoan()` validating available liquidity in lender pool, generating contract, and posting balanced double-entry to SHA-256 ledger (`1105-INTERCOMPANY-LOAN-RECEIVABLE` / `1001-HOLDING-CASH-POOL`).
-  - Implement `accrueMonthlyInterest()` recording Holding's net interest margin revenue into ledger (`4105-INTERCOMPANY-INTEREST-INCOME`).
-  - Implement `getTreasurySummary()` returning aggregate pool liquidity and projected annual holding income.
+- [x] **11.3 Treasury & In-House Banking Module** in `apex-ui/src/components/treasury/`:
+  - `CashPoolList.tsx` (66 LOC) — Subsidiary cash pool balances and yield rates.
+  - `LoanSimulatorCard.tsx` (128 LOC) — Interactive working capital disbursement simulator with 2.50% NIM spread.
+  - `TreasuryDashboard.tsx` (84 LOC) — Treasury KPI metrics and alert banners.
 
-- [x] **10.4 REST API Controller** in `services/apex-finance-service/src/main/java/com/apex/finance/controller/TreasuryHoldingController.java`:
-  - Expose `GET /api/v1/finance/treasury/summary` for dashboard liquidity and income KPIs.
-  - Expose `POST /api/v1/finance/treasury/loans` for originating new intercompany working capital facilities.
-  - Expose `GET /api/v1/finance/treasury/loans` and `POST /loans/{id}/accrue-interest`.
+- [x] **11.4 Procurement Portal & FSM Workflow** in `apex-ui/src/components/procurement/`:
+  - `RequisitionTable.tsx` (90 LOC) — Finite State Machine status badges (`DRAFT` -> `PENDING` -> `APPROVED` -> `ORDERED`) and contextual actions.
+  - `CreatePrModal.tsx` (120 LOC) — Zero-trust validated PR submission form with multi-line item totals.
+  - `ProcurementPortal.tsx` (61 LOC) — Procurement container with commitment metrics.
 
-- [x] **10.5 Unit & Scenario Tests** in `services/apex-finance-service/src/test/java/com/apex/finance/service/TreasuryHoldingServiceTest.java`:
-  - Validate successful loan origination, insufficient liquidity rejection, self-lending defense, and monthly interest accrual posting to GL.
-  - Verified 4/4 passing unit tests with 100% assertion coverage.
+- [x] **11.5 HRIS & Budget Encumbrance Directory** in `apex-ui/src/components/hris/`:
+  - `CostCenterBudget.tsx` (63 LOC) — Budget encumbrance progress bars (Allocated vs Reserved vs Spent).
+  - `OrgHierarchyTree.tsx` (115 LOC) — Interactive approval limit escalator simulator.
+  - `HrisDirectory.tsx` (26 LOC) — Module container.
 
-- [x] **10.6 Interactive Treasury Holding Frontend Dashboard** in `apex-ui/src/App.tsx`:
-  - Visual summary cards for total liquidity, 2.50% NIM spread, projected annual income, and DJP audit compliance.
-  - Split view of subsidiary cash pool accounts (`SUB-AGRO` surplus vs `SUB-MFG` deficit).
-  - Interactive loan simulator calculating borrower interest, lender yield, and net holding income in realtime.
+- [x] **11.6 Cryptographic Ledger & Audit Explorer** in `apex-ui/src/components/finance/`:
+  - `HashChainVisualizer.tsx` (75 LOC) — Visual cryptographic block linkage displaying `PrevHash` -> `CurrentHash` SHA-256 digests.
+  - `LedgerAuditView.tsx` (55 LOC) — Interactive chain verification button and tamper-evidence status banner.
+
+- [x] **11.7 Production Build Verification & Git Hygiene**:
+  - TypeScript build (`tsc -b && vite build`) passed with 100% zero errors in 15s.
+  - Added `*.tsbuildinfo` to root and frontend `.gitignore`. All 15 components confirmed $\le$ 128 LOC (strictly adhering to AGENT.md Section 7 $\le$ 150-200 LOC limit).
